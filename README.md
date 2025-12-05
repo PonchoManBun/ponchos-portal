@@ -5,6 +5,7 @@ A fantasy-themed Model Context Protocol (MCP) server architecture for coordinati
 ## 🏰 Project Overview
 
 Poncho's Portal implements a hierarchical agent coordination system inspired by Arthurian legend:
+
 - **King Poncho**: Central gateway coordinating all Lords
 - **7 Specialized Lords**: Domain experts handling specific quest types
   - Lord Architect: System design & architecture
@@ -18,6 +19,7 @@ Poncho's Portal implements a hierarchical agent coordination system inspired by 
 ## 🎯 Current Status: Week 1-2 Complete ✅
 
 **King Gateway MVP Built!**
+
 - King coordinates 2 Lords (Architect + Scribe)
 - Full JSON-RPC 2.0 protocol implementation
 - Automated test suite: 6/6 tests passing
@@ -75,6 +77,7 @@ Poncho's-Portal/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 ```bash
 pip install fastapi uvicorn httpx pydantic
 ```
@@ -82,22 +85,26 @@ pip install fastapi uvicorn httpx pydantic
 ### Running the MVP
 
 **Terminal 1 - Lord Architect:**
+
 ```powershell
 cd Magic-Tower/Foundry
 python lord_architect.py
 ```
 
 **Terminal 2 - Lord Scribe:**
+
 ```powershell
 python lord_scribe.py
 ```
 
 **Terminal 3 - King Gateway:**
+
 ```powershell
 python king_gateway.py
 ```
 
 **Terminal 4 - Run Tests:**
+
 ```powershell
 python test_king_gateway.py
 ```
@@ -122,12 +129,14 @@ curl -X POST http://localhost:8000/quest `
 **Objective**: Research MCP server architectures to design Round Table MCP Server for managing 7 specialized Lords.
 
 **Phase 1 Results** (Intelligence Gathering):
+
 - ✅ 22 MCP candidates identified and analyzed
 - ✅ Pattern comparison across 6 dimensions
 - ✅ 5 core repositories recommended for deep study
 - ✅ Round Table architecture designed
 
 **Phase 2 Progress** (Deep Study - Weeks 1-2):
+
 - ✅ IBM ContextForge gateway patterns extracted
 - ✅ Complete request flow traced and documented
 - ✅ King Gateway MVP built (170 LOC)
@@ -135,6 +144,7 @@ curl -X POST http://localhost:8000/quest `
 - ✅ Automated test suite passing (6/6 tests)
 
 **Key Findings**:
+
 - Gateway + Workflow Engine + Persistent Memory = Winning Pattern
 - Database-backed registry enables dynamic Lord registration
 - JSON-RPC 2.0 provides standard protocol for LLM-tool integration
@@ -143,19 +153,24 @@ curl -X POST http://localhost:8000/quest `
 ## 🔬 Technical Details
 
 ### MCP Protocol
+
 All Lords communicate via [Model Context Protocol](https://modelcontextprotocol.io) using JSON-RPC 2.0:
+
 - `tools/list`: Discover available tools
 - `tools/call`: Execute a tool
 - `resources/read`: Access resources
 - `prompts/get`: Retrieve prompts
 
 ### Pattern Extraction
+
 Based on analysis of production MCP servers:
+
 - **IBM ContextForge** (9.4/10): Gateway architecture model
 - **n8n** (9.2/10): Workflow orchestration patterns (Week 3-4)
 - **Memory MCP** (9.0/10): Persistent state patterns (Week 5-6)
 
 ### Technology Stack
+
 - **Framework**: FastAPI (async Python web framework)
 - **Protocol**: JSON-RPC 2.0 over HTTP
 - **Transport**: HTTP (SSE/WebSocket support planned)
@@ -173,16 +188,19 @@ Based on analysis of production MCP servers:
 ### Phase 2 Continuation
 
 **Week 3-4: Workflow Orchestration**
+
 - Study n8n DAG execution engine
 - Implement sequential Lord coordination
 - Add workflow state persistence
 
 **Week 5-6: Persistent State**
+
 - Study Memory MCP PostgreSQL + pgvector patterns
 - Migrate Lord registry to database
 - Add quest history and multi-day quest support
 
 **Week 7-8: Full Integration**
+
 - Deploy all 7 Lords
 - Test complex multi-Lord quests
 - Validate production readiness
@@ -190,12 +208,14 @@ Based on analysis of production MCP servers:
 ## 🧪 Testing
 
 Run the automated test suite:
+
 ```powershell
 cd Magic-Tower/Foundry
 python test_king_gateway.py
 ```
 
 **Current Results**: 6/6 tests passing ✅
+
 - Health checks
 - Lord listing
 - Quest routing to Lord Architect
@@ -214,6 +234,7 @@ MIT License - See LICENSE file for details
 ## 🎭 The Fantasy Theme
 
 Poncho's Portal uses Arthurian legend as a mental model for distributed agent systems:
+
 - **King**: Central coordinator (gateway)
 - **Lords**: Specialized experts (MCP servers)
 - **Round Table**: Democratic coordination (no hierarchy among Lords)
