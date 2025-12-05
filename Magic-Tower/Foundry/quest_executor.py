@@ -19,6 +19,13 @@ from typing import Any, Dict, List, Optional, Callable, Set
 from datetime import datetime
 import httpx
 
+try:
+    from quest_persistence import QuestRepository
+    PERSISTENCE_AVAILABLE = True
+except ImportError:
+    PERSISTENCE_AVAILABLE = False
+    QuestRepository = None
+
 
 class ExecutionStatus(str, Enum):
     """Quest/Lord execution status"""
@@ -28,6 +35,9 @@ class ExecutionStatus(str, Enum):
     ERROR = "error"
     WAITING = "waiting"
     CANCELED = "canceled"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class ErrorMode(str, Enum):
@@ -152,9 +162,11 @@ class QuestExecutor:
         "sentinel": 8004,
     }
     
-    def __init__(self, hooks: Optional[ExecutionHooks] = None):
+    def __init__(self, hooks: Optional[ExecutionHooks] = None, repository: Optional['QuestRepository'] = None):
         self.hooks = hooks or ExecutionHooks()
         self.status = ExecutionStatus.NEW
+        self.repository = repository
+        self._auto_save = repository is not None  # Enable auto-save if repository provided
     
     async def execute_quest(self, quest_data: QuestExecutionData) -> QuestExecutionData:
         """
@@ -211,13 +223,33 @@ class QuestExecutor:
                 "data": current_step.data,
                 "error": current_step.error,
             }
+            
+            # Auto-save quest state after each Lord execution
+            if self._auto_save and self.repository:
+                self.repository.save_quest(quest_data)
+                self.repository.save_lord_run(
+                    quest_id=quest_data.quest_id,
+                    lord_name=current_step.lord_name,
+                    tool_name=current_step.tool_name,
+                    run_index=current_step.run_index,
+                    status="success" if current_step.status == ExecutionStatus.SUCCESS else "error",
+                    input_data=self._get_previous_output(quest_data) or quest_data.input_data,
+                    output_data=current_step.data,
+                    error_message=current_step.error.get("message") if current_step.error else None,
+                    start_time=current_step.start_time,
+                    end_time=current_step.start_time + current_step.execution_time if current_step.execution_time else None
+                )
         
         # Quest completed
         if quest_data.status == ExecutionStatus.RUNNING:
-            quest_data.status = ExecutionStatus.SUCCESS
+            quest_data.status = ExecutionStatus.COMPLETED
         
         quest_data.end_time = time.time()
         quest_data.output_data = self._get_previous_output(quest_data)
+        
+        # Save final quest state
+        if self._auto_save and self.repository:
+            self.repository.save_quest(quest_data)
         
         await self.hooks.emit("quest_finished", quest_data)
         
@@ -353,6 +385,156 @@ class QuestExecutor:
         # Get latest run
         latest_run_index = max(lord_runs.keys())
         return lord_runs[latest_run_index].get("data")
+    
+    # ============================================================
+    # QUEST PAUSE/RESUME/REPLAY
+    # ============================================================
+    
+    async def pause_quest(self, quest_id: str) -> bool:
+        """
+        Pause a running quest and save snapshot.
+        
+        Args:
+            quest_id: Quest identifier
+            
+        Returns:
+            True if paused successfully
+            
+        Note: Quest must be manually stopped externally before calling pause.
+        This method saves the current state for later resumption.
+        """
+        if not self.repository:
+            raise RuntimeError("Cannot pause quest: no repository configured")
+        
+        # Load current quest state
+        quest_data = self.repository.load_quest(quest_id)
+        if not quest_data:
+            return False
+        
+        # Mark as paused
+        quest_data.status = ExecutionStatus.PAUSED
+        quest_data.end_time = time.time()
+        
+        # Save snapshot
+        self.repository.save_snapshot(
+            quest_id=quest_id,
+            run_data=quest_data.run_data,
+            execution_stack=quest_data.execution_stack,
+            reason="pause"
+        )
+        
+        # Update quest status
+        self.repository.save_quest(quest_data)
+        
+        return True
+    
+    async def resume_quest(self, quest_id: str) -> QuestExecutionData:
+        """
+        Resume a paused quest from latest snapshot.
+        
+        Args:
+            quest_id: Quest identifier
+            
+        Returns:
+            Updated quest data after resuming execution
+        """
+        if not self.repository:
+            raise RuntimeError("Cannot resume quest: no repository configured")
+        
+        # Load quest and snapshot
+        quest_data = self.repository.load_quest(quest_id)
+        if not quest_data:
+            raise ValueError(f"Quest {quest_id} not found")
+        
+        if quest_data.status != ExecutionStatus.PAUSED:
+            raise ValueError(f"Quest {quest_id} is not paused (status: {quest_data.status})")
+        
+        # Load latest snapshot
+        snapshot = self.repository.load_latest_snapshot(quest_id)
+        if snapshot:
+            run_data, execution_stack = snapshot
+            quest_data.run_data = run_data
+            quest_data.execution_stack = execution_stack
+        
+        # Reset timing
+        quest_data.status = ExecutionStatus.RUNNING
+        quest_data.start_time = time.time()
+        quest_data.end_time = None
+        
+        # Resume execution
+        return await self.execute_quest(quest_data)
+    
+    async def replay_quest(self, quest_id: str, from_lord: Optional[str] = None) -> QuestExecutionData:
+        """
+        Replay a quest from the beginning or from a specific Lord.
+        
+        Args:
+            quest_id: Quest identifier
+            from_lord: Optional Lord name to start from (replays from that point)
+            
+        Returns:
+            Updated quest data after replay
+        """
+        if not self.repository:
+            raise RuntimeError("Cannot replay quest: no repository configured")
+        
+        # Load original quest
+        original_quest = self.repository.load_quest(quest_id)
+        if not original_quest:
+            raise ValueError(f"Quest {quest_id} not found")
+        
+        # Create new quest data with same input
+        new_quest_id = f"{quest_id}-replay-{int(time.time())}"
+        
+        if from_lord:
+            # Find where to start in execution stack
+            start_index = None
+            for i, step in enumerate(original_quest.execution_stack):
+                if step.lord_name == from_lord:
+                    start_index = i
+                    break
+            
+            if start_index is None:
+                raise ValueError(f"Lord {from_lord} not found in quest execution stack")
+            
+            # Build execution stack from this point
+            execution_stack = original_quest.execution_stack[start_index:]
+            
+            # Use run_data up to this point as starting context
+            run_data = {}
+            for lord_name, runs in original_quest.run_data.items():
+                if lord_name != from_lord:
+                    run_data[lord_name] = runs
+        else:
+            # Full replay from beginning
+            execution_stack = list(original_quest.execution_stack)
+            run_data = {}
+        
+        replay_quest_data = QuestExecutionData(
+            quest_id=new_quest_id,
+            quest_type=original_quest.quest_type,
+            input_data=original_quest.input_data,
+            execution_stack=execution_stack,
+            run_data=run_data
+        )
+        
+        # Execute replay
+        return await self.execute_quest(replay_quest_data)
+    
+    def load_quest(self, quest_id: str) -> Optional[QuestExecutionData]:
+        """
+        Load quest state from repository.
+        
+        Args:
+            quest_id: Quest identifier
+            
+        Returns:
+            QuestExecutionData if found, None otherwise
+        """
+        if not self.repository:
+            raise RuntimeError("Cannot load quest: no repository configured")
+        
+        return self.repository.load_quest(quest_id)
 
 
 # Example: Build a quest chain
