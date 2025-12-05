@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+
+# Large cloned repositories (we document them, don't commit them)
+Magic-Tower/Foundation/MCP-Servers/mcp-context-forge/
+Magic-Tower/Foundation/MCP-Servers/n8n/
+Magic-Tower/Foundation/MCP-Servers/mcp-official-servers/
+Magic-Tower/Foundation/MCP-Servers/mcp-agent/
+
+# Keep directory structure but not cloned content
+!Magic-Tower/Foundation/MCP-Servers/README.md
